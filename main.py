@@ -99,7 +99,6 @@ model.to(device)
 pruning_model_random(model,0.6)
 
 #CONVERT KERNEL TO CSR
-model.conv1.make_kernel_sparse()
 model.conv1.training = False
 model.conv1.use_sparse = True
 
@@ -124,3 +123,6 @@ out = model.conv1.forward(dummy_input)
 
 print(f"SP_OUT: {sp_out}")
 print(f"OUT: {out}")
+
+print(dummy_input.shape)
+print(out.shape)

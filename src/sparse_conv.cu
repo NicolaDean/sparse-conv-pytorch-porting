@@ -11,6 +11,8 @@ extern "C" void gpu_sparse_conv(bool FUSE_RELU, int num, const void *input, cons
 	const void *colidx, const void *values, const void *bias, int height, int width, int pad_h, int pad_w, 
 	int stride_h, int stride_w, int dilation_h, int dilation_w, int kernel_h, int kernel_w, void *output, int num_oc, int num_groups);
 
+extern "C" void gpu_kernel_stretch(const void *rowptr, void *colidx, int M, 
+		int height, int width, int pad_h, int pad_w, int kernel_h, int kernel_w);
 
 static unsigned CudaTest(const char *msg) {
 	cudaError_t e;
@@ -49,6 +51,37 @@ void test_wrapper(){
 	printf("Banana\n");
 	
 }
+
+__global__ void stretch_kernel(const int *rowptr, int *colidx, int M,
+		int height, int width, int pad_h, int pad_w, int kernel_h, int kernel_w) {
+	int out_channel = blockIdx.x * blockDim.x + threadIdx.x;
+	if(out_channel < M) {
+		for (int j = rowptr[out_channel]; j < rowptr[out_channel + 1]; ++j) {
+			int col = colidx[j];
+			int kernel_col = col % kernel_w;
+			int kernel_row = (col / kernel_w) % kernel_h;
+			int in_channel = col / (kernel_w * kernel_h);
+			//assert(in_channel < conv_in_channels_);
+			colidx[j] = (in_channel * (height + pad_h) + kernel_row) * (width + pad_w) + kernel_col;
+		}
+	}
+}
+
+void caffe_gpu_stretch(const int *rowptr, int *colidx, int M, 
+		int height, int width, int pad_h, int pad_w, int kernel_h, int kernel_w) {
+	int nthreads = 512;
+	int nblocks = (M - 1) / nthreads + 1;
+	stretch_kernel<<<nblocks, nthreads>>>(rowptr, colidx, M, 
+			height, width, pad_h, pad_w, kernel_h, kernel_w);
+	CudaTest("Kernel Stretch Error");
+}
+
+void gpu_kernel_stretch(const void *rowptr, void *colidx, int M, 
+		int height, int width, int pad_h, int pad_w, int kernel_h, int kernel_w){
+
+	caffe_gpu_stretch((int*)rowptr,(int*)colidx,M,height,width,pad_h,pad_w,kernel_h,kernel_w);		
+}
+
 
 template <typename Dtype>
 __global__ void sconv_dilation(const int *rowptr, const int *colidx, const Dtype *values,
