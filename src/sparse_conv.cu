@@ -245,7 +245,7 @@ __global__ void sconv_shm(const int * rowptr, const int * colidx, const Dtype * 
 				for (int off = 0; off < end; ++off) {
 					Dtype weight = values_s[off];
 					int pos = colidx_s[off];
-					sum += weight * __ldg(in_ptr+pos);
+					sum += weight * __ldg(in_ptr+pos); //This instruction store the value in the L1 cache
 				}
 			}
 		}
@@ -535,6 +535,7 @@ void caffe_gpu_sconv(bool FUSE_RELU, int num, const Dtype *input, const int ifma
 	const int *colidx, const Dtype *values, const Dtype *bias, int height, int width, int pad_h, int pad_w, 
 	int stride_h, int stride_w, int dilation_h, int dilation_w, int kernel_h, int kernel_w, Dtype *output, int num_oc, int num_groups)
 {
+	printf("\033[93m");
 	printf("Num of inputs: %d\n",num);
 	printf("Num of input channels: %d\n",num);
 	printf("Num of output channels: %d\n",num_oc);
@@ -556,7 +557,7 @@ void caffe_gpu_sconv(bool FUSE_RELU, int num, const Dtype *input, const int ifma
 	const int output_h = (height + 2 * pad_h - (dilation_h * (kernel_h - 1) + 1)) / stride_h + 1;
 	const int output_w = (width  + 2 * pad_w - (dilation_w * (kernel_w - 1) + 1)) / stride_w + 1;
 
-	printf("OUTPUT SHAPE: [%d,%d]\n",output_h,output_w);
+	printf("\033[93mOUTPUT SHAPE: [%d,%d]\n",output_h,output_w);
 	//printf("We have a sparse conv with:\n-INPUT:(%d,%d,%d)\n-Kernel:(%d,%d,%d)-Output:(%d,%d,%d)\n",);
 	int TILE_H = 16;
 	int TILE_W = 16;
@@ -569,6 +570,7 @@ void caffe_gpu_sconv(bool FUSE_RELU, int num, const Dtype *input, const int ifma
 
 	//Dilatation is a kernel with some empty columns and rows
 	if (dilation_h != 1 || dilation_w != 1) {
+		printf("SparseConv With Dilation\n");
 		dim3 threads(TILE_W, TILE_H, OC_BLOCK);
 		dim3 grid(ntiles_w, ntiles_h, nblocks);
 		sconv_dilation<Dtype><<<grid, threads>>>(rowptr, colidx, values, input, 
@@ -576,6 +578,7 @@ void caffe_gpu_sconv(bool FUSE_RELU, int num, const Dtype *input, const int ifma
 			kernel_h, kernel_w, bias, output, num_oc, output_h, output_w);
 	} else if (stride_h == 1 && stride_w == 1 && height == width && kernel_h == kernel_w && pad_h == pad_w) {
 		if(FUSE_RELU) {
+			printf("SparseConv With Dilation\n");
 			dim3 threads(16, 16, OC_BLOCK);
 			dim3 grid(ntiles_w, ntiles_h, nblocks);
 			sconv_relu_tiled<Dtype,16,16><<<grid, threads>>>(rowptr, colidx, values, input, 
@@ -658,6 +661,7 @@ void caffe_gpu_sconv(bool FUSE_RELU, int num, const Dtype *input, const int ifma
 
 
 	printf("End of computation\n");
+	printf("\033[0m");
 	CudaTest("sconv_kernel solving failed");
 }
 
