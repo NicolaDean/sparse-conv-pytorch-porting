@@ -84,7 +84,7 @@ LEARNING_RATE = 0.001
 BATCH_SIZE = 32
 N_EPOCHS = 4
 
-IMG_SIZE = 12
+IMG_SIZE = 32
 N_CLASSES = 10
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -123,6 +123,11 @@ out = model.conv1.forward(dummy_input)
 
 print(f"SP_OUT: {sp_out}")
 print(f"OUT: {out}")
+
+if torch.all(sp_out.eq(out)):
+   print("\033[92mSUCCESS => Same Outputs\033[0m")
+else:
+   print("\033[91mFAIL => Divergent Outputs\033[0m")
 
 print(dummy_input.shape)
 print(out.shape)
