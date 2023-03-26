@@ -14,6 +14,30 @@ The paper that describe the SparseConvolution implementation contained in Ecosin
 The original C++ coda is available in the following repository:\
 https://github.com/chenxuhao/caffe-escoin\
 More specifically in this file: https://github.com/chenxuhao/caffe-escoin/blob/master/src/caffe/util/math_functions.cu => function caffe_gpu_sconv(...)
+# How To use:
+To use our custom pytorch layer simply compile it with the Makefile then:\
+```
+import sparse_conv as sp
 
-# How our Pytorch version work:
-TODO
+
+self.conv1 = sp.SparseConv2D(in_channels=1, out_channels=6, kernel_size=5, stride=1)
+       
+```
+
+
+# How Run the example:
+TODO better
+
+- Compile the CUDA library by executing the Makefile => (simply do make on terminal)
+```
+make all
+```
+- Execute the example script:
+```
+python main.py
+```
+
+# How It works:
+
+We have simply written a CUDA => python wrapper using the ctype package of python.\
+Then we relized a custom pytorch module (**SparseConv2D**) tthat use Ecosin CUDA kernels to compute sparse conv.

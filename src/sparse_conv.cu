@@ -78,7 +78,8 @@ void caffe_gpu_stretch(const int *rowptr, int *colidx, int M,
 
 void gpu_kernel_stretch(const void *rowptr, void *colidx, int M, 
 		int height, int width, int pad_h, int pad_w, int kernel_h, int kernel_w){
-
+		
+	printf("Stretch kernel\n");
 	caffe_gpu_stretch((int*)rowptr,(int*)colidx,M,height,width,pad_h,pad_w,kernel_h,kernel_w);		
 }
 
@@ -119,9 +120,11 @@ __global__ void sconv_base(const int *rowptr, const int *colidx, const Dtype *va
 	const int output_row = blockIdx.y * blockDim.y + threadIdx.y;
 	const int output_col = blockIdx.x * blockDim.x + threadIdx.x;
 	const int oc = blockIdx.z * blockDim.z + threadIdx.z;
+
 	if (oc < num_oc) {
 		if (output_row < output_h) {
 			if (output_col < output_w) {
+				//Project output grid on input grid
 				const Dtype *in_ptr = input + output_row * stride_h * (width + pad_w) + output_col * stride_w;
 				Dtype sum = 0;
 				for (int j = rowptr[oc]; j < rowptr[oc + 1]; ++j) {

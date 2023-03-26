@@ -33,24 +33,30 @@ class SparseConv2D(torch.nn.Conv2d):
 
 
         def make_kernel_sparse(self,in_height,in_width):
+                #Copy kernel
                 k = copy.deepcopy(self.weight.detach())
                 print(k)
                 print(f"Kernel Shape:{k.shape}")
+
+                #Reshape kernel from (CH , W , H) => (CH , W * H)
                 k_size = k.shape[2] * k.shape[3]
                 x = torch.reshape(k, (-1,k_size))
                 print(f"New Kernel Shape:{x.shape}")
+
+                #Convert to CSR
                 self.sparse_kernel = x.to_sparse_csr()
                 
-                #Define the CSR format
+                #Define the CSR format in tenrors to CUDA
                 self.rowptr = self.sparse_kernel.crow_indices().cuda()
                 self.colidx = self.sparse_kernel.col_indices().cuda()
                 self.values = self.sparse_kernel.values().cuda()
                 
-                #Stretch the Kernel to input size:
+                print(f"colidx: {self.colidx}")
+                #Stretch the Kernel to input size: (SEE PAPER OF ESCOTING)
                 kernel_h = self.weight.shape[2]
                 kernel_w = self.weight.shape[3]
                 gpu_kernel_stretch(self.rowptr,self.colidx,self.out_channels,in_height,in_width,self.padding,self.padding,kernel_h,kernel_w)
-                
+
                 print(f"rowptr: {self.rowptr}")
                 print(f"colidx: {self.colidx}")
                 print(f"values: {self.values}")
@@ -61,7 +67,7 @@ class SparseConv2D(torch.nn.Conv2d):
                         for j in range(self.rowptr[out_channel] , self.rowptr[out_channel+1]):
                                 col = copy.deepcopy(self.colidx[j])
                                 kernel_col = col%kernel_w
-                                kernel_row = (col/kernel_w)%kernel_h
+                                kernel_row = math.floor((col/kernel_w))%kernel_h
                                 in_channel = math.floor(col/(kernel_w*kernel_h))
                                 self.colidx[j] = math.floor((in_channel*(in_height + self.padding) + kernel_row)*(in_width + self.padding) + kernel_col)
                                 print(f"Changing colidx[{j}] from {col} => {self.colidx[j]}")
