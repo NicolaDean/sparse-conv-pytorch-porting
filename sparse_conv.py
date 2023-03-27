@@ -11,10 +11,10 @@ import copy
 from sparse_conv_wrapper import *
 
 #--------------------------------------------------------
-#-----------TEST THE FUNCTIONS---------------------------
+#-----------Sparse Conv Custom Layer---------------------
 #--------------------------------------------------------
 
-
+#THIS LAYER MAKE SENSE ONLY ON CUDA, WE HAVE NOT DONE THE PORTING OF THE C++ VERSION, IF NO CUDA AVAILABLE IT WILL USE THE CLASSIC nn.conv2d
 
 class SparseConv2D(torch.nn.Conv2d):
         def __init__(self, in_channels: int, out_channels: int, kernel_size: _size_2_t, stride: _size_2_t  = 1, padding: _size_2_t = 0, dilation: _size_2_t = 1, bias: bool = None):
@@ -35,7 +35,7 @@ class SparseConv2D(torch.nn.Conv2d):
         def make_kernel_sparse(self,in_height,in_width):
                 #Copy kernel
                 k = copy.deepcopy(self.weight.detach())
-                print(k)
+                #print(k)
                 print(f"Kernel Shape:{k.shape}")
 
                 #Reshape kernel from (CH , W , H) => (CH , W * H)
@@ -47,21 +47,21 @@ class SparseConv2D(torch.nn.Conv2d):
                 self.sparse_kernel = x.to_sparse_csr()
                 
                 #Define the CSR format in tenrors to CUDA
-                self.rowptr = self.sparse_kernel.crow_indices().cuda()
-                self.colidx = self.sparse_kernel.col_indices().cuda()
+                self.rowptr = self.sparse_kernel.crow_indices().to(torch.int).cuda()
+                self.colidx = self.sparse_kernel.col_indices().to(torch.int).cuda()
                 self.values = self.sparse_kernel.values().cuda()
                 
-                print(f"colidx: {self.colidx}")
                 #Stretch the Kernel to input size: (SEE PAPER OF ESCOTING)
                 kernel_h = self.weight.shape[2]
                 kernel_w = self.weight.shape[3]
                 gpu_kernel_stretch(self.rowptr,self.colidx,self.out_channels,in_height,in_width,self.padding,self.padding,kernel_h,kernel_w)
 
-                print(f"rowptr: {self.rowptr}")
-                print(f"colidx: {self.colidx}")
-                print(f"values: {self.values}")
+                #print(f"rowptr: {self.rowptr} => {self.rowptr.type()}")
+                #print(f"colidx: {self.colidx} => {self.colidx.type()}")
+                #print(f"values: {self.values} => {self.values.type()}")
 
                 return
+                #End Deprecated => Sequential Code
                 for out_channel in range(self.out_channels):
                         print(f"ROW [{out_channel}]")
                         for j in range(self.rowptr[out_channel] , self.rowptr[out_channel+1]):
@@ -72,10 +72,15 @@ class SparseConv2D(torch.nn.Conv2d):
                                 self.colidx[j] = math.floor((in_channel*(in_height + self.padding) + kernel_row)*(in_width + self.padding) + kernel_col)
                                 print(f"Changing colidx[{j}] from {col} => {self.colidx[j]}")
                 
-                #End
+                
                 
 
         def forward(self, input: Tensor) -> Tensor:  # input: HWCN
+                #TODO CHECK if CUDA is available and in case not use nn.conv2D forward
+
+                #TODO CHECK SPARSITY
+
+                #TODO ADD "Group > 1" compatibility
 
                 #Training mode
                 if self.training:
@@ -107,12 +112,21 @@ class SparseConv2D(torch.nn.Conv2d):
                         self.make_kernel_sparse(in_height,in_width)
                 
                 #Allocate outputs
-                output = torch.zeros(batch_size, self.out_channels,output_h, output_w).cuda()
-
+                output  = torch.zeros(batch_size, self.out_channels,output_h, output_w).cuda()
+                input   = input.cuda()
                 #Calculate sparse conv
                 sparse_conv(input,self.in_channels,1,in_height,in_width,self.padding,self.padding,self.stride,self.stride,self.dilation,self.dilation,self.rowptr,self.colidx,self.values,kernel_h,kernel_w,self.bias,output,self.out_channels,self.groups)
 
                 #Return output
                 return output
 
+
+
+#-------------------------------------------------------------------------------------------------------
+#-----------Helper Model Module with some custom method to initialize sparseConv layers-----------------
+#-------------------------------------------------------------------------------------------------------
+''''
+class SparseModel(nn.Module):
+        def __init__():
+'''
 

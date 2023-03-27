@@ -79,7 +79,7 @@ void caffe_gpu_stretch(const int *rowptr, int *colidx, int M,
 void gpu_kernel_stretch(const void *rowptr, void *colidx, int M, 
 		int height, int width, int pad_h, int pad_w, int kernel_h, int kernel_w){
 		
-	printf("Stretch kernel\n");
+	//printf("Stretch kernel\n");
 	caffe_gpu_stretch((int*)rowptr,(int*)colidx,M,height,width,pad_h,pad_w,kernel_h,kernel_w);		
 }
 
@@ -208,7 +208,25 @@ __global__ void sconv_shm(const int * rowptr, const int * colidx, const Dtype * 
 	const int output_col = blockIdx.x * blockDim.x + threadIdx.x;
 	const int oc = blockIdx.z * blockDim.z + threadIdx.z;
 
+	/*
+	if(output_row==0 && output_col==0 && oc == 0){
+		for(int o=0;o<1;o++){
+			for(int i=0;i<10;i++){
+				printf("\nRow[%d]\n",i);
+				for(int j=0;j<10;j++){
+					printf("%f,",input[i*10 + j]);
+				}
+			}
+		}
+	}
 	
+	if(output_row==0 && output_col==0 && oc == 0){
+		for(int i=0;i<6;i++){
+			printf("\nRowptr[%d] = %d\n",i,rowptr[i]);
+		}
+	}
+	*/
+
 
 	__shared__ Dtype values_s[SHMEM_SIZE];
 	__shared__ int colidx_s[SHMEM_SIZE];
@@ -220,9 +238,10 @@ __global__ void sconv_shm(const int * rowptr, const int * colidx, const Dtype * 
 	const int length = row_end - row_start;
 	const int BLK_SIZE = TILE_H * TILE_W;
 
-	//printf("Thread: (%d,%d,%d) => [%d,%d]\n",output_row,output_col,oc,row_start,row_end);
 	Dtype sum = 0;
 	//Dtype sum = bias[oc];
+
+	//Each thread has a dedicated 2D grid of weights in shared memory
 	for(int i = 0; i < length; i += SHMEM_SIZE) {
 		int base_addr = row_start + i;
 		for (int j = 0; j < SHMEM_SIZE; j += BLK_SIZE) {
@@ -238,27 +257,32 @@ __global__ void sconv_shm(const int * rowptr, const int * colidx, const Dtype * 
 			__syncthreads();
 		}
 
-		if (output_row < output_h) {
-			if (output_col < output_w) {
+		//Actual Sparse Conv Code
+
+		//Each thread compute a specific output pixel (With tiling since we cant actualy spawn that many threads)
+		if (output_row < output_h) { //Check we are accessing valid row
+			if (output_col < output_w) { //Check we are accessing valid col
+				//printf("Thread: (%d,%d,%d) => [%d,%d]\n",output_row,output_col,oc,row_start,row_end);
+				//Projecting the output pixel on the input grid
 				const Dtype *in_ptr = input + output_row * stride_h * (width + pad_w) + output_col * stride_w;
 				int end = MIN(SHMEM_SIZE, length - i);
 				for (int off = 0; off < end; ++off) {
-					Dtype weight = values_s[off];
-					int pos = colidx_s[off];
-					sum += weight * __ldg(in_ptr+pos); //This instruction store the value in the L1 cache
+					Dtype weight = values_s[off];		//Get the current NonZeroWeight to elaborate
+					int pos = colidx_s[off];			//Add the projected offset saved in colIdx to get the corresponding input pixel
+					sum += weight * __ldg(in_ptr+pos);  //This instruction store the value in the L1 cache
 				}
 			}
 		}
 		__syncthreads();
 	}
 
-	//if (oc < num_oc) {
+	if (oc < num_oc) {
 		if (output_row < output_h) {
 			if (output_col < output_w) {
 				output[(oc * output_h + output_row) * output_w + output_col] = sum;
 			}
 		}
-	//}
+	}
 }
 
 template <typename Dtype, int TILE_H, int TILE_W, int WIDTH, int K, int PAD = (K - 1) / 2>
@@ -535,6 +559,7 @@ void caffe_gpu_sconv(bool FUSE_RELU, int num, const Dtype *input, const int ifma
 	const int *colidx, const Dtype *values, const Dtype *bias, int height, int width, int pad_h, int pad_w, 
 	int stride_h, int stride_w, int dilation_h, int dilation_w, int kernel_h, int kernel_w, Dtype *output, int num_oc, int num_groups)
 {
+	/*
 	printf("\033[93m");
 	printf("Num of inputs: %d\n",num);
 	printf("Num of input channels: %d\n",num);
@@ -546,31 +571,32 @@ void caffe_gpu_sconv(bool FUSE_RELU, int num, const Dtype *input, const int ifma
 	printf("Padding Shape (%d,%d)\n",pad_h,pad_w);
 	printf("Stride Shape (%d,%d)\n",stride_h,stride_w);
 	printf("Dilation Shape (%d,%d)\n",dilation_h,dilation_w);
-	/*
+	
 	printf("Rowptr: [");
 	for(int i=0;i<6;i++){
 			printf("%f,",rowptr[i]);
-	}*/
+	}
 	printf("]\n");
+	*/
 	//print_device_info(0);
 	//Compute the output shape based on the 
 	const int output_h = (height + 2 * pad_h - (dilation_h * (kernel_h - 1) + 1)) / stride_h + 1;
 	const int output_w = (width  + 2 * pad_w - (dilation_w * (kernel_w - 1) + 1)) / stride_w + 1;
 
-	printf("\033[93mOUTPUT SHAPE: [%d,%d]\n",output_h,output_w);
+	//printf("\033[93mOUTPUT SHAPE: [%d,%d]\n",output_h,output_w);
 	//printf("We have a sparse conv with:\n-INPUT:(%d,%d,%d)\n-Kernel:(%d,%d,%d)-Output:(%d,%d,%d)\n",);
 	int TILE_H = 16;
 	int TILE_W = 16;
 	int ntiles_h = (output_h - 1) / TILE_H + 1;
 	int ntiles_w = (output_w - 1) / TILE_W + 1;
 	int nblocks = (num_oc - 1) / OC_BLOCK + 1;
-	//printf("num=%d, nblocks=%d, num_oc=%d\n", num, nblocks, num_oc);
+
 	//printf("height=%d, width=%d, output_h=%d, output_w=%d\n", height, width, output_h, output_w);
 	//printf("stride_h=%d, stride_w=%d, pad_h=%d, pad_width=%d\n", stride_h, stride_w, pad_h, pad_w);
 
 	//Dilatation is a kernel with some empty columns and rows
 	if (dilation_h != 1 || dilation_w != 1) {
-		printf("SparseConv With Dilation\n");
+		//printf("SparseConv With Dilation\n");
 		dim3 threads(TILE_W, TILE_H, OC_BLOCK);
 		dim3 grid(ntiles_w, ntiles_h, nblocks);
 		sconv_dilation<Dtype><<<grid, threads>>>(rowptr, colidx, values, input, 
@@ -578,14 +604,16 @@ void caffe_gpu_sconv(bool FUSE_RELU, int num, const Dtype *input, const int ifma
 			kernel_h, kernel_w, bias, output, num_oc, output_h, output_w);
 	} else if (stride_h == 1 && stride_w == 1 && height == width && kernel_h == kernel_w && pad_h == pad_w) {
 		if(FUSE_RELU) {
-			printf("SparseConv With Dilation\n");
+			//printf("SparseConv With Symmetric shapes + RELU => eg square\n");
 			dim3 threads(16, 16, OC_BLOCK);
 			dim3 grid(ntiles_w, ntiles_h, nblocks);
 			sconv_relu_tiled<Dtype,16,16><<<grid, threads>>>(rowptr, colidx, values, input, 
 				height, width, pad_h, pad_w, stride_h, stride_w, kernel_h, kernel_w, 
 				bias, output, num_oc, output_h, output_w);
 		} else {
+			
 			if(num == 1) {
+				//printf("SparseConv With Symmetric shapes (BatchSize = 1) => eg square\n");
 				if(height == 27) {
 				//if(0) {
 					ntiles_w = DIVIDE_INTO(output_w, 32);
@@ -612,6 +640,7 @@ void caffe_gpu_sconv(bool FUSE_RELU, int num, const Dtype *input, const int ifma
 					nblocks = std::min(max_blocks, nblocks);
 					//printf("Launching CUDA solver: %d CTAs (max %d/SM), %d threads/CTA ...\n", nblocks, max_blocks_per_SM, nthreads);
 //*/	
+					//printf("num=%d, ntiles_h=%d, ntiles_w=%d, nblocks=%d, num_oc=%d\n", num, ntiles_h, ntiles_w, nblocks, num_oc);
 					dim3 threads(TILE_W, TILE_H, 1);
 					dim3 grid(ntiles_w, ntiles_h, nblocks);
 					sconv_shm<Dtype,16,16><<<grid, threads>>>(rowptr, colidx, values, input, 
@@ -619,6 +648,7 @@ void caffe_gpu_sconv(bool FUSE_RELU, int num, const Dtype *input, const int ifma
 						bias, output, num_oc, output_h, output_w);
 				}
 			} else {
+				//printf("SparseConv With Symmetric shapes (BatchSize = N) => eg square\n");
 				dim3 threads(16, 16, 1);
 				//if(nblocks >= 128 && nblocks < 224) {
 				if(0) {
@@ -637,6 +667,7 @@ void caffe_gpu_sconv(bool FUSE_RELU, int num, const Dtype *input, const int ifma
 			}
 		}
 	} else {
+		//printf("SparseConv With Asymmetric shapes => eg Rectangle\n");
 		// fall through to the default path
 		dim3 threads(TILE_W, TILE_H, OC_BLOCK);
 		dim3 grid(ntiles_w, ntiles_h, nblocks);
@@ -659,10 +690,10 @@ void caffe_gpu_sconv(bool FUSE_RELU, int num, const Dtype *input, const int ifma
 		}
 	}
 
-
-	printf("End of computation\n");
-	printf("\033[0m");
 	CudaTest("sconv_kernel solving failed");
+
+	//printf("End of computation\n");
+	//printf("\033[0m");
 }
 
 template void caffe_gpu_sconv<int>(bool FUSE_RELU, int num, const int *input, const int ifmap_size, const int *rowptr, 

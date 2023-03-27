@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch
 import torch.nn.functional as F
 import torch.nn.utils.prune as prune
+import copy
 
 class LeNet5(nn.Module):
     """
@@ -111,23 +112,25 @@ model.conv1.use_sparse = True
 #Generate a dummy input to give the convolution
 dummy_input = torch.randn(1, 1,IMG_SIZE,IMG_SIZE, dtype=torch.float).to(device)
 dummy_input = dummy_input.cuda()
+input = copy.deepcopy(dummy_input)
+input = input.cuda()
 
 #Generate sparse conv ouptput
 sp_out = model.conv1.forward(dummy_input)
 
 #Generate vanilla conv output
 model.conv1.use_sparse = False
-out = model.conv1.forward(dummy_input)
+out = model.conv1.forward(input)
 
 #TODO Compare vanilla vs sparse output
 
-print(f"SP_OUT: {sp_out}")
-print(f"OUT: {out}")
-
+#print(f"SP_OUT: {sp_out}")
+#print(f"OUT: {out}")
+print("Vanilla vs SparseConv:")
 if torch.all(sp_out.eq(out)):
    print("\033[92mSUCCESS => Same Outputs\033[0m")
 else:
    print("\033[91mFAIL => Divergent Outputs\033[0m")
 
-print(dummy_input.shape)
-print(out.shape)
+print(f"IN -shape: {dummy_input.shape}")
+print(f"OUT-shape: {out.shape}")
