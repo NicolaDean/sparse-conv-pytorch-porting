@@ -10,16 +10,27 @@ import copy
 
 from sparse_conv_wrapper import *
 
+from enum import Enum
+
+# class syntax
+class Sparse_modes(Enum):
+        Training                = 1
+        Inference_Vanilla       = 2
+        Inference_Sparse        = 3
+        Test                    = 4
+
 #--------------------------------------------------------
 #-----------Sparse Conv Custom Layer---------------------
 #--------------------------------------------------------
 
 #THIS LAYER MAKE SENSE ONLY ON CUDA, WE HAVE NOT DONE THE PORTING OF THE C++ VERSION, IF NO CUDA AVAILABLE IT WILL USE THE CLASSIC nn.conv2d
-
 class SparseConv2D(torch.nn.Conv2d):
+        
         def __init__(self, in_channels: int, out_channels: int, kernel_size: _size_2_t, stride: _size_2_t  = 1, padding: _size_2_t = 0, dilation: _size_2_t = 1, bias: bool = None):
                 self.use_sparse = False
                 self.sparse_kernel = None
+                self.mode = Sparse_modes.Training
+
                 groups = 1
                 super(SparseConv2D, self).__init__(in_channels,out_channels,kernel_size,stride,padding,dilation,groups,None)#Conv2D init function
 
@@ -31,15 +42,38 @@ class SparseConv2D(torch.nn.Conv2d):
                 self.dilation = dilation
                 self.bias = bias
 
+        def set_mode(self,mode=Sparse_modes.Training):
+                '''
+                This method change the configuration of inference of this layer
+                1.Training                => Like nn.Conv2d
+                2.Inference_Vanilla       => Like nn.Conv2d
+                3.Inference_Sparse        => Sparse Convolution
+                '''
 
+                self.mode =  mode
+                '''
+                if mode == Sparse_modes.Training:
+                        self.training   = True
+                        self.use_sparse = False
+                elif mode == Sparse_modes.Inference_Vanilla:
+                        self.training   = False
+                        self.use_sparse = False
+                elif mode == Sparse_modes.Inference_Sparse:
+                        self.training   = False
+                        self.use_sparse = True
+                '''
         def make_kernel_sparse(self,in_height,in_width):
+                '''
+                This method convert the kernel from (N,C,H,W) => (N,C,H*W)
+                Then Convert the kernel into CSR format with ctypes compatible with the CUDA implementation
+                '''
                 #Copy kernel
                 k = copy.deepcopy(self.weight.detach())
                 #print(k)
                 print(f"Kernel Shape:{k.shape}")
 
                 #Reshape kernel from (CH , W , H) => (CH , W * H)
-                k_size = k.shape[2] * k.shape[3]
+                k_size = k.shape[1] * k.shape[2] * k.shape[3]
                 x = torch.reshape(k, (-1,k_size))
                 print(f"New Kernel Shape:{x.shape}")
 
@@ -72,8 +106,29 @@ class SparseConv2D(torch.nn.Conv2d):
                                 self.colidx[j] = math.floor((in_channel*(in_height + self.padding) + kernel_row)*(in_width + self.padding) + kernel_col)
                                 print(f"Changing colidx[{j}] from {col} => {self.colidx[j]}")
                 
-                
-                
+        def test_behaviour(self, input:Tensor,print_flag=True) ->Tensor:
+                '''
+                Check if the Sparse Layer and Conv2D layer has same behaviour
+                '''
+                #Set mode to sparse
+                self.set_mode(Sparse_modes.Inference_Sparse)
+                #Compute nn.Conv2D output
+                vanilla_out = super().forward(input)
+                #Compute the SparseConv2D output
+                sparse_out  = self.forward(input)
+
+                #Comparing the Output
+                print("Vanilla vs SparseConv:")
+                if torch.all(sparse_out.eq(vanilla_out)):
+                        self.set_mode(Sparse_modes.Test)
+                        if print_flag:
+                                print("\033[92mSUCCESS => Same Outputs\033[0m")
+                        return sparse_out
+                else:
+                        if print_flag:
+                                print("\033[91mFAIL => Divergent Outputs\033[0m")
+                        raise Exception("\033[91mFAILED TEST SPARSE BEHAVIOUR => Divergent Outputs\033[0m") 
+                        return False
 
         def forward(self, input: Tensor) -> Tensor:  # input: HWCN
                 #TODO CHECK if CUDA is available and in case not use nn.conv2D forward
@@ -83,11 +138,11 @@ class SparseConv2D(torch.nn.Conv2d):
                 #TODO ADD "Group > 1" compatibility
 
                 #Training mode
-                if self.training:
+
+                if self.mode == Sparse_modes.Training or self.mode == Sparse_modes.Inference_Vanilla:
                         return super().forward(input) #IF WE ARE IN TRAINING USE THE CLASSIC CONV2D forward to build the weights
-                #No training but no sparse conv
-                if not self.use_sparse:
-                        return super().forward(input)
+                elif self.mode == Sparse_modes.Test:
+                        return self.test_behaviour(input,print_flag=True)
 
                 #No training with sparse conv
 
@@ -125,8 +180,45 @@ class SparseConv2D(torch.nn.Conv2d):
 #-------------------------------------------------------------------------------------------------------
 #-----------Helper Model Module with some custom method to initialize sparseConv layers-----------------
 #-------------------------------------------------------------------------------------------------------
-''''
+
 class SparseModel(nn.Module):
-        def __init__():
-'''
+        '''
+        This custom model simply help with the usage of Models that integrate our custom SparseConv module
+        Contain helper method to initialize the sparseConv layers and change inference mode from vanilla to sparse (and opposite)
+        '''
+        def __init__(self, sparse_conv_flag=True):
+                self._sparse_conv_flag=sparse_conv_flag
+                super(SparseModel, self).__init__()
+                if sparse_conv_flag:
+                        self.conv = SparseConv2D
+                else:
+                        self.conv = nn.Conv2d
+
+        def _set_sparse_layers_mode(self,mode=Sparse_modes.Training):
+                '''
+                Set the mode of all SparseConv2D layer in the net to "mode"
+                '''
+                for name, m in self.named_modules():
+                        if isinstance(m, SparseConv2D):
+                                m.set_mode(mode)
+
+        def _initialize_sparse_layers(self,input_shape):
+                #Change the Network mode to sparse
+                self._set_sparse_layers_mode(mode = Sparse_modes.Inference_Sparse)
+                #Generate a dummy input
+                dummy_input = torch.randn(1, 1,input_shape[2],input_shape[3], dtype=torch.float).cuda()
+                dummy_input = dummy_input.cuda()
+                #Do a forword so that all sparseConv layer initialize the CSR kernel and stuff
+                self.forward(dummy_input)
+
+        def forward(self,input: Tensor) -> Tensor:
+                #IMPLEMENT IT AS YOU LIKE
+                return
+
+               
+
+
+                                
+
+
 
