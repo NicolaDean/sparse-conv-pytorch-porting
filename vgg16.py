@@ -140,7 +140,7 @@ pruning_model_random(model,0.6)
 
 #SET MODEL IN TESTING MODE (For each SparseConv compare Conv2D with SparseConv2D)
 model._initialize_sparse_layers(input_shape=(1,1,IMG_SIZE,IMG_SIZE))
-model._set_sparse_layers_mode(sp.Sparse_modes.Inference_Sparse)
+model._set_sparse_layers_mode(sp.Sparse_modes.Test)
 
 #------------------------------------------
 #------------------------------------------
@@ -149,7 +149,8 @@ model._set_sparse_layers_mode(sp.Sparse_modes.Inference_Sparse)
 #------------------------------------------
 
 #Generate a dummy input to give the convolution
-dummy_input = torch.randn(1, 1,IMG_SIZE,IMG_SIZE, dtype=torch.float).to(device)
+batch_size = 1
+dummy_input = torch.randn(batch_size, 1,IMG_SIZE,IMG_SIZE, dtype=torch.float).to(device)
 dummy_input = dummy_input.cuda()
 input = copy.deepcopy(dummy_input)
 input = input.cuda()

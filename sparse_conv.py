@@ -169,7 +169,7 @@ class SparseConv2D(torch.nn.Conv2d):
                 output_w = math.floor((in_width  + 2 * self.padding - (self.dilation * (kernel_w - 1) + 1)) / self.stride + 1)
                 
                 #Convert kernel to CSR
-                batch_size = 1 #TODO extract from input
+                batch_size = input.shape[0] #TODO extract from input
 
                 #Convert kernel to CSR format if not already done
                 if self.sparse_kernel == None:
@@ -185,7 +185,7 @@ class SparseConv2D(torch.nn.Conv2d):
 
                 #Align the input to the padded version of the input (Add 0 to the borders)
                 if self.padding != 0:
-                        padding_input_alignment(self.padded_input,input,self.in_channels,in_height,in_width,self.padding,self.padding)
+                        padding_input_alignment(self.padded_input,input,self.in_channels,in_height,in_width,self.padding,self.padding,batch_size)
                         input = self.padded_input
 
                 #Allocate outputs       

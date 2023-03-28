@@ -4,17 +4,20 @@
 #include <thrust/reduce.h>
 #include <cmath>
 
-
+//By Nicola Dean
 extern "C" void test_wrapper(); 
 
+//By Nicola Dean
 extern "C" void gpu_sparse_conv(bool FUSE_RELU, int num, const void *input, const int ifmap_size, const void *rowptr, 
 	const void *colidx, const void *values, const void *bias, int height, int width, int pad_h, int pad_w, 
 	int stride_h, int stride_w, int dilation_h, int dilation_w, int kernel_h, int kernel_w, void *output, int num_oc, int num_groups);
 
+//By Nicola Dean
 extern "C" void gpu_kernel_stretch(const void *rowptr, void *colidx, int M, 
 		int height, int width, int pad_h, int pad_w, int kernel_h, int kernel_w);
 
-extern "C" void padding_input_alignment(void *dst, const void *src, int num_channels, int height, int width, int pad_h, int pad_w);
+//By Nicola Dean
+extern "C" void padding_input_alignment(void *dst, const void *src, int num_channels, int height, int width, int pad_h, int pad_w, int batch_size);
 
 static unsigned CudaTest(const char *msg) {
 	cudaError_t e;
@@ -78,6 +81,7 @@ void caffe_gpu_stretch(const int *rowptr, int *colidx, int M,
 	CudaTest("Kernel Stretch Error");
 }
 
+//By Nicola Dean
 void gpu_kernel_stretch(const void *rowptr, void *colidx, int M, 
 		int height, int width, int pad_h, int pad_w, int kernel_h, int kernel_w){
 		
@@ -125,8 +129,14 @@ template void copy_input_data<float>(float *dst, const float *src, int num_chann
 template void copy_input_data<double>(double *dst, const double *src, int num_channels, int height, int width, int pad_h, int pad_w);
 
 
-void padding_input_alignment(void *dst, const void *src, int num_channels, int height, int width, int pad_h, int pad_w){
-	copy_input_data((float*)dst,(float*)src,num_channels,height,width,pad_h,pad_w);
+//By Nicola Dean
+void padding_input_alignment(void *dst, const void *src, int num_channels, int height, int width, int pad_h, int pad_w, int batch_size){
+	int pad_offset = num_channels * (height + pad_h) * (width + pad_w);
+	int offset = num_channels * (height) * (width);
+	for(int n=0;n<batch_size;n++){
+		printf("Copy Data for: %d\n",n);
+		copy_input_data((float*)(dst) + n*pad_offset,(float*)(src) + n*offset,num_channels,height,width,pad_h,pad_w);
+	}
 }
 
 template <typename Dtype>
