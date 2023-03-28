@@ -115,3 +115,31 @@ def gpu_kernel_stretch(rowptr,colidx,out_channels,height,width,pad_h,pad_w,kerne
                                ctypes.c_int(pad_w),
                                ctypes.c_int(kernel_h),
                                ctypes.c_int(kernel_w),)
+    
+#---------------------------------------------------------------------------
+#---------------------------------------------------------------------------
+#-------------------PADDING ALIGNMENT KERNEL--------------------------------
+#---------------------------------------------------------------------------
+#---------------------------------------------------------------------------
+
+_SP_lib.padding_input_alignment.restype = None
+_SP_lib.padding_input_alignment.argtypes = [
+                                ctypes.c_void_p,#dst
+                                ctypes.c_void_p,#src
+                                ctypes.c_int,#num_channels
+                                ctypes.c_int,#height
+                                ctypes.c_int,#width
+                                ctypes.c_int,#pad_h
+                                ctypes.c_int,#pad_w
+                                ]
+
+def padding_input_alignment(dst,src,num_channels,height,width,pad_h,pad_w):
+      _SP_lib.padding_input_alignment(  
+                                        ctypes.c_void_p(dst.data_ptr()),
+                                        ctypes.c_void_p(src.data_ptr()),
+                                        ctypes.c_int(num_channels),
+                                        ctypes.c_int(height),
+                                        ctypes.c_int(width),
+                                        ctypes.c_int(pad_h),
+                                        ctypes.c_int(pad_w)
+                                     )

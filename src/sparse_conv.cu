@@ -14,6 +14,8 @@ extern "C" void gpu_sparse_conv(bool FUSE_RELU, int num, const void *input, cons
 extern "C" void gpu_kernel_stretch(const void *rowptr, void *colidx, int M, 
 		int height, int width, int pad_h, int pad_w, int kernel_h, int kernel_w);
 
+extern "C" void padding_input_alignment(void *dst, const void *src, int num_channels, int height, int width, int pad_h, int pad_w);
+
 static unsigned CudaTest(const char *msg) {
 	cudaError_t e;
 	cudaDeviceSynchronize();
@@ -83,6 +85,49 @@ void gpu_kernel_stretch(const void *rowptr, void *colidx, int M,
 	caffe_gpu_stretch((int*)rowptr,(int*)colidx,M,height,width,pad_h,pad_w,kernel_h,kernel_w);		
 }
 
+template <typename Dtype>
+__global__ void copy_input(Dtype *dst, const Dtype *src, int num_channels, int height, int width, int pad_h, int pad_w) {
+	int xid = blockIdx.x * blockDim.x + threadIdx.x;
+	int yid = blockIdx.y * blockDim.y + threadIdx.y;
+	int zid = blockIdx.z * blockDim.z + threadIdx.z;
+#if 0
+	Dtype * dst_ptr = dst + (xid * (height + pad_h) + yid + pad_h) * (width + pad_w) + pad_w;
+	const Dtype * src_ptr = src + (xid * height + yid) * width;
+	if(xid < num_channels)
+		if(yid < height)
+			if(zid < width)
+				dst_ptr[zid] = src_ptr[zid];
+#else
+	Dtype * dst_ptr = dst + (zid * (height + pad_h) + yid + pad_h) * (width + pad_w) + pad_w;
+	const Dtype * src_ptr = src + (zid * height + yid) * width;
+	if(zid < num_channels)
+		if(yid < height)
+			if(xid < width)
+				dst_ptr[xid] = src_ptr[xid];
+#endif
+}
+
+template <typename Dtype>
+void copy_input_data(Dtype *dst, const Dtype *src, int num_channels, int height, int width, int pad_h, int pad_w) {
+	const int TILE_SZ = 16;
+	const int BLOCK_SZ = 1;
+	const int ntiles_h = (height - 1) / TILE_SZ + 1;
+	const int ntiles_w = (width - 1) / TILE_SZ + 1;
+	const int nblocks = (num_channels - 1) / BLOCK_SZ + 1;
+	//dim3 grid(nblocks, ntiles_h, ntiles_w);
+	//dim3 threads(BLOCK_SZ, TILE_SZ, TILE_SZ);
+	dim3 grid(ntiles_h, ntiles_w, nblocks);
+	dim3 threads(TILE_SZ, TILE_SZ, BLOCK_SZ);
+	copy_input<Dtype><<<grid,threads>>>(dst, src, num_channels, height, width, pad_h, pad_w);
+}
+
+template void copy_input_data<float>(float *dst, const float *src, int num_channels, int height, int width, int pad_h, int pad_w);
+template void copy_input_data<double>(double *dst, const double *src, int num_channels, int height, int width, int pad_h, int pad_w);
+
+
+void padding_input_alignment(void *dst, const void *src, int num_channels, int height, int width, int pad_h, int pad_w){
+	copy_input_data((float*)dst,(float*)src,num_channels,height,width,pad_h,pad_w);
+}
 
 template <typename Dtype>
 __global__ void sconv_dilation(const int *rowptr, const int *colidx, const Dtype *values,

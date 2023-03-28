@@ -6,7 +6,8 @@ from torch import Tensor
 
 import math
 import copy
-
+import numpy as np
+import matplotlib.pyplot as plt
 
 from sparse_conv_wrapper import *
 
@@ -89,11 +90,13 @@ class SparseConv2D(torch.nn.Conv2d):
                 kernel_h = self.weight.shape[2]
                 kernel_w = self.weight.shape[3]
                 gpu_kernel_stretch(self.rowptr,self.colidx,self.out_channels,in_height,in_width,self.padding,self.padding,kernel_h,kernel_w)
-
+                
                 #print(f"rowptr: {self.rowptr} => {self.rowptr.type()}")
                 #print(f"colidx: {self.colidx} => {self.colidx.type()}")
                 #print(f"values: {self.values} => {self.values.type()}")
 
+                #Initialize PaddedInput pointer
+                #self.padded_input = 
                 return
                 #End Deprecated => Sequential Code
                 for out_channel in range(self.out_channels):
@@ -119,15 +122,22 @@ class SparseConv2D(torch.nn.Conv2d):
 
                 #Comparing the Output
                 print("Vanilla vs SparseConv:")
-                if torch.all(sparse_out.eq(vanilla_out)):
+                comparison = sparse_out.eq(vanilla_out)
+                comparison = comparison.to("cpu")
+                if torch.all(comparison):
                         self.set_mode(Sparse_modes.Test)
                         if print_flag:
                                 print("\033[92mSUCCESS => Same Outputs\033[0m")
+                        #print(comparison)
                         return sparse_out
                 else:
                         if print_flag:
                                 print("\033[91mFAIL => Divergent Outputs\033[0m")
+                        #plt.imshow(comparison.numpy())
+                        #plt.colorbar()
+                        #plt.show()
                         raise Exception("\033[91mFAILED TEST SPARSE BEHAVIOUR => Divergent Outputs\033[0m") 
+
                         return False
 
         def forward(self, input: Tensor) -> Tensor:  # input: HWCN

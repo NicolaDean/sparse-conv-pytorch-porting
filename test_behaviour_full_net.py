@@ -80,7 +80,7 @@ model.to(device)
 pruning_model_random(model,0.6)
 
 #SET MODEL IN TESTING MODE (For each SparseConv compare Conv2D with SparseConv2D)
-model._initialize_sparse_layers((1,1,IMG_SIZE,IMG_SIZE))
+model._initialize_sparse_layers(input_shape=(1,1,IMG_SIZE,IMG_SIZE))
 model._set_sparse_layers_mode(sp.Sparse_modes.Test)
 
 #------------------------------------------
