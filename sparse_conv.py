@@ -32,6 +32,7 @@ class SparseConv2D(torch.nn.Conv2d):
                 self.sparse_kernel = None
                 self.mode = Sparse_modes.Training
                 self.padded_input = None
+                self.padded_batch_size = 0
 
                 groups = 1
                 super(SparseConv2D, self).__init__(in_channels,out_channels,kernel_size,stride,padding,dilation,groups,None)#Conv2D init function
@@ -132,6 +133,8 @@ class SparseConv2D(torch.nn.Conv2d):
                 else:
                         if print_flag:
                                 print("\033[91mFAIL => Divergent Outputs\033[0m")
+                        print(f"Vanilla:{vanilla_out}")
+                        print(f"Sparse:{sparse_out}")
                         #plt.imshow(comparison.numpy())
                         #plt.colorbar()
                         #plt.show()
@@ -178,8 +181,8 @@ class SparseConv2D(torch.nn.Conv2d):
                 ifmap_size =  self.in_channels * (in_height + self.padding) * (in_width + self.padding)
 
                 #Compute the padded input
-                if self.padded_input == None and self.padding != 0:
-                        print("Allocating the padded input")
+                if (self.padded_input == None and self.padding != 0) or batch_size != self.padded_batch_size:
+                        self.padded_batch_size = batch_size
                         padded_input_size = batch_size * (self.in_channels * (in_height + self.padding) * (in_width + self.padding) + self.padding * (in_width + 2 * self.padding))
                         self.padded_input = torch.zeros(padded_input_size).cuda()
 
@@ -192,7 +195,7 @@ class SparseConv2D(torch.nn.Conv2d):
                 output  = torch.zeros(batch_size, self.out_channels,output_h, output_w).cuda()
                 input   = input.cuda()
                 #Calculate sparse conv
-                sparse_conv(input,self.in_channels,1,in_height,in_width,self.padding,self.padding,self.stride,self.stride,self.dilation,self.dilation,self.rowptr,self.colidx,self.values,kernel_h,kernel_w,self.bias,output,self.out_channels,self.groups)
+                sparse_conv(input,self.in_channels,ifmap_size,in_height,in_width,self.padding,self.padding,self.stride,self.stride,self.dilation,self.dilation,self.rowptr,self.colidx,self.values,kernel_h,kernel_w,self.bias,output,self.out_channels,self.groups,batch_size)
 
                 #Return output
                 return output

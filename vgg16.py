@@ -149,9 +149,13 @@ model._set_sparse_layers_mode(sp.Sparse_modes.Test)
 #------------------------------------------
 
 #Generate a dummy input to give the convolution
-batch_size = 1
+
+print("----------------TEST CORRECTNES:--------------------")
+batch_size = 2
 dummy_input = torch.randn(batch_size, 1,IMG_SIZE,IMG_SIZE, dtype=torch.float).to(device)
 dummy_input = dummy_input.cuda()
+
+print(f"INPUT SHAPE : {dummy_input.shape}")
 input = copy.deepcopy(dummy_input)
 input = input.cuda()
 

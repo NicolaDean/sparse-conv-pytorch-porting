@@ -133,9 +133,12 @@ template void copy_input_data<double>(double *dst, const double *src, int num_ch
 void padding_input_alignment(void *dst, const void *src, int num_channels, int height, int width, int pad_h, int pad_w, int batch_size){
 	int pad_offset = num_channels * (height + pad_h) * (width + pad_w);
 	int offset = num_channels * (height) * (width);
+
+	float *dst_ = (float*)(dst);
+	float *src_ = (float*)(src);
+
 	for(int n=0;n<batch_size;n++){
-		printf("Copy Data for: %d\n",n);
-		copy_input_data((float*)(dst) + n*pad_offset,(float*)(src) + n*offset,num_channels,height,width,pad_h,pad_w);
+		copy_input_data(dst_+ n*pad_offset,src_ + n*offset,num_channels,height,width,pad_h,pad_w);
 	}
 }
 

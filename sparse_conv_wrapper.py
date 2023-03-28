@@ -52,14 +52,14 @@ _SP_lib.gpu_sparse_conv.argtypes = [
                                 ctypes.c_int#numgrpups
                                 ]
 
-def sparse_conv(input,in_channels,ifmap_size,height,width,pad_h,pad_w,stride_h,stride_w,dilatation_h,dilatation_w,rowptr,colidx,values,kernel_h,kernel_w,bias,output,output_channels,num_groups):
+def sparse_conv(input,in_channels,ifmap_size,height,width,pad_h,pad_w,stride_h,stride_w,dilatation_h,dilatation_w,rowptr,colidx,values,kernel_h,kernel_w,bias,output,output_channels,num_groups,batch_size):
         '''
         Compute the sparse convolution (Porting of Escotin Caffe framework)
         '''
 
         _SP_lib.gpu_sparse_conv(
                              ctypes.c_bool(False),#use_relu
-                             ctypes.c_int(1),#num
+                             ctypes.c_int(batch_size),#num
                              ctypes.c_void_p(input.data_ptr()),
                              ctypes.c_int(ifmap_size),#ifmap
                              ctypes.c_void_p(rowptr.data_ptr()),#rowptr
