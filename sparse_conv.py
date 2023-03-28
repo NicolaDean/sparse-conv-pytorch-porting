@@ -31,6 +31,7 @@ class SparseConv2D(torch.nn.Conv2d):
                 self.use_sparse = False
                 self.sparse_kernel = None
                 self.mode = Sparse_modes.Training
+                self.padded_input = None
 
                 groups = 1
                 super(SparseConv2D, self).__init__(in_channels,out_channels,kernel_size,stride,padding,dilation,groups,None)#Conv2D init function
@@ -95,8 +96,6 @@ class SparseConv2D(torch.nn.Conv2d):
                 #print(f"colidx: {self.colidx} => {self.colidx.type()}")
                 #print(f"values: {self.values} => {self.values.type()}")
 
-                #Initialize PaddedInput pointer
-                #self.padded_input = 
                 return
                 #End Deprecated => Sequential Code
                 for out_channel in range(self.out_channels):
@@ -176,7 +175,20 @@ class SparseConv2D(torch.nn.Conv2d):
                 if self.sparse_kernel == None:
                         self.make_kernel_sparse(in_height,in_width)
                 
-                #Allocate outputs
+                ifmap_size =  self.in_channels * (in_height + self.padding) * (in_width + self.padding)
+
+                #Compute the padded input
+                if self.padded_input == None and self.padding != 0:
+                        print("Allocating the padded input")
+                        padded_input_size = batch_size * (self.in_channels * (in_height + self.padding) * (in_width + self.padding) + self.padding * (in_width + 2 * self.padding))
+                        self.padded_input = torch.zeros(padded_input_size).cuda()
+
+                #Align the input to the padded version of the input (Add 0 to the borders)
+                if self.padding != 0:
+                        padding_input_alignment(self.padded_input,input,self.in_channels,in_height,in_width,self.padding,self.padding)
+                        input = self.padded_input
+
+                #Allocate outputs       
                 output  = torch.zeros(batch_size, self.out_channels,output_h, output_w).cuda()
                 input   = input.cuda()
                 #Calculate sparse conv

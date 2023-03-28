@@ -56,7 +56,6 @@ def sparse_conv(input,in_channels,ifmap_size,height,width,pad_h,pad_w,stride_h,s
         '''
         Compute the sparse convolution (Porting of Escotin Caffe framework)
         '''
-        ifmap_size =  in_channels * (height + pad_h) * (width + pad_w)
 
         _SP_lib.gpu_sparse_conv(
                              ctypes.c_bool(False),#use_relu

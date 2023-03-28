@@ -17,59 +17,59 @@ class VGG16(sp.SparseModel):
         super(VGG16, self).__init__(sparse_conv_flag)
 
         self.layer1 = nn.Sequential(
-            self.conv(1, 64, kernel_size=3, stride=1, padding=0),
+            self.conv(1, 64, kernel_size=3, stride=1, padding=1),
             #nn.BatchNorm2d(64),
             nn.ReLU())
         self.layer2 = nn.Sequential(
-            self.conv(64, 64, kernel_size=3, stride=1, padding=0),
+            self.conv(64, 64, kernel_size=3, stride=1, padding=1),
             #nn.BatchNorm2d(64),
             nn.ReLU(), 
             nn.MaxPool2d(kernel_size = 2, stride = 2))
         self.layer3 = nn.Sequential(
-            self.conv(64, 128, kernel_size=3, stride=1, padding=0),
+            self.conv(64, 128, kernel_size=3, stride=1, padding=1),
             #nn.BatchNorm2d(128),
             nn.ReLU())
         self.layer4 = nn.Sequential(
-            self.conv(128, 128, kernel_size=3, stride=1, padding=0),
+            self.conv(128, 128, kernel_size=3, stride=1, padding=1),
             #nn.BatchNorm2d(128),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size = 2, stride = 2))
         self.layer5 = nn.Sequential(
-            self.conv(128, 256, kernel_size=3, stride=1, padding=0),
+            self.conv(128, 256, kernel_size=3, stride=1, padding=1),
             #nn.BatchNorm2d(256),
             nn.ReLU())
         self.layer6 = nn.Sequential(
-            self.conv(256, 256, kernel_size=3, stride=1, padding=0),
+            self.conv(256, 256, kernel_size=3, stride=1, padding=1),
             #nn.BatchNorm2d(256),
             nn.ReLU())
         self.layer7 = nn.Sequential(
-            self.conv(256, 256, kernel_size=3, stride=1, padding=0),
+            self.conv(256, 256, kernel_size=3, stride=1, padding=1),
             #nn.BatchNorm2d(256),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size = 2, stride = 2))
         self.layer8 = nn.Sequential(
-            self.conv(256, 512, kernel_size=3, stride=1, padding=0),
+            self.conv(256, 512, kernel_size=3, stride=1, padding=1),
             #nn.BatchNorm2d(512),
             nn.ReLU())
         self.layer9 = nn.Sequential(
-            self.conv(512, 512, kernel_size=3, stride=1, padding=0),
+            self.conv(512, 512, kernel_size=3, stride=1, padding=1),
             #nn.BatchNorm2d(512),
             nn.ReLU())
         self.layer10 = nn.Sequential(
-            self.conv(512, 512, kernel_size=3, stride=1, padding=0),
+            self.conv(512, 512, kernel_size=3, stride=1, padding=1),
             #nn.BatchNorm2d(512),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size = 2, stride = 2))
         self.layer11 = nn.Sequential(
-            self.conv(512, 512, kernel_size=3, stride=1, padding=0),
+            self.conv(512, 512, kernel_size=3, stride=1, padding=1),
             #nn.BatchNorm2d(512),
             nn.ReLU())
         self.layer12 = nn.Sequential(
-            self.conv(512, 512, kernel_size=3, stride=1, padding=0),
+            self.conv(512, 512, kernel_size=3, stride=1, padding=1),
             #nn.BatchNorm2d(512),
             nn.ReLU())
         self.layer13 = nn.Sequential(
-            self.conv(512, 512, kernel_size=3, stride=1, padding=0),
+            self.conv(512, 512, kernel_size=3, stride=1, padding=1),
             #nn.BatchNorm2d(512),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size = 2, stride = 2))
@@ -118,7 +118,7 @@ def pruning_model_random(model, px):
         pruning_method=prune.RandomUnstructured,
         amount=px,
     ) 
-
+    
 RANDOM_SEED = 42
 LEARNING_RATE = 0.001
 BATCH_SIZE = 32
@@ -138,10 +138,9 @@ model.to(device)
 #PRUNE THE MODEL TO ADD SPARSITY
 pruning_model_random(model,0.6)
 
-with torch.no_grad():
-    #SET MODEL IN TESTING MODE (For each SparseConv compare Conv2D with SparseConv2D)
-    model._initialize_sparse_layers(input_shape=(1,1,IMG_SIZE,IMG_SIZE))
-    model._set_sparse_layers_mode(sp.Sparse_modes.Test)
+#SET MODEL IN TESTING MODE (For each SparseConv compare Conv2D with SparseConv2D)
+model._initialize_sparse_layers(input_shape=(1,1,IMG_SIZE,IMG_SIZE))
+model._set_sparse_layers_mode(sp.Sparse_modes.Inference_Sparse)
 
 #------------------------------------------
 #------------------------------------------

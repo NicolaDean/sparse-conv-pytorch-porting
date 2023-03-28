@@ -16,7 +16,7 @@ class LeNet5(sp.SparseModel):
         super(LeNet5, self).__init__(sparse_conv_flag)
 
 
-        self.conv1 = self.conv(in_channels=1, out_channels=6, kernel_size=5, stride=1)
+        self.conv1 = self.conv(in_channels=1, out_channels=6, kernel_size=5, stride=1,padding=1)
         self.tanh1 = nn.Tanh()
         self.pool1 = nn.AvgPool2d(kernel_size=2)
         self.conv2 = self.conv(in_channels=6, out_channels=16, kernel_size=5, stride=1)
