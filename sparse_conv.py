@@ -33,7 +33,7 @@ class SparseConv2D(torch.nn.Conv2d):
                 self.mode = Sparse_modes.Training
                 self.padded_input = None
                 self.padded_batch_size = 0
-
+                self.output = None
                 groups = 1
                 super(SparseConv2D, self).__init__(in_channels,out_channels,kernel_size,stride,padding,dilation,groups,None)#Conv2D init function
 
@@ -180,25 +180,31 @@ class SparseConv2D(torch.nn.Conv2d):
                 
                 ifmap_size =  self.in_channels * (in_height + self.padding) * (in_width + self.padding)
 
-                #Compute the padded input
+                #Allocate outputs tensor if not exist    
+                if self.output == None or batch_size != self.padded_batch_size:
+                        #TODO => Change this output dinamically based on batch size
+                        self.output  = torch.zeros(batch_size, self.out_channels,output_h, output_w).cuda()
+
+                #IF we do not have allocated a "Padded input matrix" yet then allocate it
                 if (self.padded_input == None and self.padding != 0) or batch_size != self.padded_batch_size:
+                        print("Padding alignment")
                         self.padded_batch_size = batch_size
                         padded_input_size = batch_size * (self.in_channels * (in_height + self.padding) * (in_width + self.padding) + self.padding * (in_width + 2 * self.padding))
                         self.padded_input = torch.zeros(padded_input_size).cuda()
 
                 #Align the input to the padded version of the input (Add 0 to the borders)
                 if self.padding != 0:
+                        #Copy input data to the padded input matrix (CUDA kernel will do it)
                         padding_input_alignment(self.padded_input,input,self.in_channels,in_height,in_width,self.padding,self.padding,batch_size)
                         input = self.padded_input
 
-                #Allocate outputs       
-                output  = torch.zeros(batch_size, self.out_channels,output_h, output_w).cuda()
-                input   = input.cuda()
+
+                #input   = input.cuda()
                 #Calculate sparse conv
-                sparse_conv(input,self.in_channels,ifmap_size,in_height,in_width,self.padding,self.padding,self.stride,self.stride,self.dilation,self.dilation,self.rowptr,self.colidx,self.values,kernel_h,kernel_w,self.bias,output,self.out_channels,self.groups,batch_size)
+                sparse_conv(input,self.in_channels,ifmap_size,in_height,in_width,self.padding,self.padding,self.stride,self.stride,self.dilation,self.dilation,self.rowptr,self.colidx,self.values,kernel_h,kernel_w,self.bias,self.output,self.out_channels,self.groups,batch_size)
 
                 #Return output
-                return output
+                return self.output
 
 
 
