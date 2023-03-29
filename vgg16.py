@@ -108,7 +108,7 @@ def pruning_model_random(model, px):
 
     parameters_to_prune =[]
     for name,m in model.named_modules():
-        if isinstance(m, nn.Conv2d):
+        if isinstance(m, sp.SparseConv2D):
             parameters_to_prune.append((m,'weight'))
 
     parameters_to_prune = tuple(parameters_to_prune)
@@ -140,7 +140,7 @@ pruning_model_random(model,0.6)
 
 #SET MODEL IN TESTING MODE (For each SparseConv compare Conv2D with SparseConv2D)
 model._initialize_sparse_layers(input_shape=(1,1,IMG_SIZE,IMG_SIZE))
-model._set_sparse_layers_mode(sp.Sparse_modes.Test)
+model._set_sparse_layers_mode(sp.Sparse_modes.Benchmark)
 
 #------------------------------------------
 #------------------------------------------

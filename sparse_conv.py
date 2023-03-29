@@ -8,6 +8,7 @@ import math
 import copy
 import numpy as np
 import matplotlib.pyplot as plt
+import torch.nn as nn
 
 from sparse_conv_wrapper import *
 
@@ -19,6 +20,7 @@ class Sparse_modes(Enum):
         Inference_Vanilla       = 2
         Inference_Sparse        = 3
         Test                    = 4
+        Benchmark               = 5
 
 #--------------------------------------------------------
 #-----------Sparse Conv Custom Layer---------------------
@@ -44,6 +46,8 @@ class SparseConv2D(torch.nn.Conv2d):
                 self.padding = padding
                 self.dilation = dilation
                 self.bias = bias
+
+                self.pad = nn.ConstantPad2d(padding,0)
 
         def set_mode(self,mode=Sparse_modes.Training):
                 '''
@@ -142,6 +146,38 @@ class SparseConv2D(torch.nn.Conv2d):
 
                         return False
 
+        def benchmark(self, input:Tensor,print_flag=True) ->Tensor:
+                starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+                #Set mode to sparse
+                self.set_mode(Sparse_modes.Inference_Sparse)
+                
+                #--------------------------------------------------
+                #Compute nn.Conv2D output
+                #--------------------------------------------------
+                print("\033[93m")
+                starter.record()
+                vanilla_out = super().forward(input)
+                ender.record()
+                # WAIT FOR GPU SYNC
+                torch.cuda.synchronize()
+                curr_time = starter.elapsed_time(ender)
+                print(f"TIME-Vanilla: {curr_time} ms")
+
+                #--------------------------------------------------
+                #Compute the SparseConv2D output
+                #--------------------------------------------------
+                starter.record()
+                sparse_out  = self.forward(input)
+                ender.record()
+                # WAIT FOR GPU SYNC
+                torch.cuda.synchronize()
+                curr_time = starter.elapsed_time(ender)
+                print(f"TIME-Sparse : {curr_time} ms")
+                print("\033[0m")
+                print("-----------------------------")
+                self.set_mode(Sparse_modes.Benchmark)
+                return sparse_out
+
         def forward(self, input: Tensor) -> Tensor:  # input: HWCN
                 #TODO CHECK if CUDA is available and in case not use nn.conv2D forward
 
@@ -155,7 +191,8 @@ class SparseConv2D(torch.nn.Conv2d):
                         return super().forward(input) #IF WE ARE IN TRAINING USE THE CLASSIC CONV2D forward to build the weights
                 elif self.mode == Sparse_modes.Test:
                         return self.test_behaviour(input,print_flag=True)
-
+                elif self.mode == Sparse_modes.Benchmark:
+                        return self.benchmark(input,print_flag=True)
                 #No training with sparse conv
 
                 #USE CUDA SPARSE CONV
@@ -182,27 +219,31 @@ class SparseConv2D(torch.nn.Conv2d):
 
                 #Allocate outputs tensor if not exist    
                 if self.output == None or batch_size != self.padded_batch_size:
+                        #self.padded_batch_size = batch_size
                         #TODO => Change this output dinamically based on batch size
                         self.output  = torch.zeros(batch_size, self.out_channels,output_h, output_w).cuda()
 
+                #print(f"Input{input.shape}")
+                
                 #IF we do not have allocated a "Padded input matrix" yet then allocate it
                 if (self.padded_input == None and self.padding != 0) or batch_size != self.padded_batch_size:
-                        print("Padding alignment")
+                        #print("Padding alignment")
                         self.padded_batch_size = batch_size
                         padded_input_size = batch_size * (self.in_channels * (in_height + self.padding) * (in_width + self.padding) + self.padding * (in_width + 2 * self.padding))
                         self.padded_input = torch.zeros(padded_input_size).cuda()
 
                 #Align the input to the padded version of the input (Add 0 to the borders)
+                starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
                 if self.padding != 0:
+                        #p = nn.ConstantPad2d(1,0)
+                        #x = p(input).cuda()
                         #Copy input data to the padded input matrix (CUDA kernel will do it)
                         padding_input_alignment(self.padded_input,input,self.in_channels,in_height,in_width,self.padding,self.padding,batch_size)
                         input = self.padded_input
 
-
                 #input   = input.cuda()
                 #Calculate sparse conv
                 sparse_conv(input,self.in_channels,ifmap_size,in_height,in_width,self.padding,self.padding,self.stride,self.stride,self.dilation,self.dilation,self.rowptr,self.colidx,self.values,kernel_h,kernel_w,self.bias,self.output,self.out_channels,self.groups,batch_size)
-
                 #Return output
                 return self.output
 
