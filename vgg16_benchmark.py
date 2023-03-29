@@ -109,6 +109,7 @@ def pruning_model_random(model, px):
     parameters_to_prune =[]
     for name,m in model.named_modules():
         if isinstance(m, sp.SparseConv2D):
+            print(f"Pruning layer {name}")
             parameters_to_prune.append((m,'weight'))
 
     parameters_to_prune = tuple(parameters_to_prune)
@@ -123,7 +124,7 @@ RANDOM_SEED = 42
 LEARNING_RATE = 0.001
 BATCH_SIZE = 32
 N_EPOCHS = 4
-
+PRUNING_PARAMETER = 0.7
 IMG_SIZE = 32
 N_CLASSES = 10
 
@@ -136,9 +137,15 @@ model = VGG16(N_CLASSES,sparse_conv_flag=True)
 model.to(device)
 
 #PRUNE THE MODEL TO ADD SPARSITY
-pruning_model_random(model,0.6)
+print("--------------------------------------")
+print(f"-----Pruning the Network at [{PRUNING_PARAMETER}]-----")
+print("--------------------------------------")
+pruning_model_random(model,PRUNING_PARAMETER)
 
 #SET MODEL IN TESTING MODE (For each SparseConv compare Conv2D with SparseConv2D)
+print("----------------------------------")
+print("-----Initialize the Network-------")
+print("----------------------------------")
 model._initialize_sparse_layers(input_shape=(1,1,IMG_SIZE,IMG_SIZE))
 model._set_sparse_layers_mode(sp.Sparse_modes.Benchmark)
 
@@ -150,7 +157,9 @@ model._set_sparse_layers_mode(sp.Sparse_modes.Benchmark)
 
 #Generate a dummy input to give the convolution
 
-print("----------------TEST CORRECTNES:--------------------")
+print("----------------------------------")
+print("-----Example of Benchmark or Test-------")
+print("----------------------------------")
 batch_size = 2
 dummy_input = torch.randn(batch_size, 1,IMG_SIZE,IMG_SIZE, dtype=torch.float).to(device)
 dummy_input = dummy_input.cuda()
