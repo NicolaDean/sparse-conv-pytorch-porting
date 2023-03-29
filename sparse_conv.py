@@ -14,13 +14,14 @@ from sparse_conv_wrapper import *
 
 from enum import Enum
 
-# class syntax
+#Define the possible layer modes
 class Sparse_modes(Enum):
-        Training                = 1
-        Inference_Vanilla       = 2
-        Inference_Sparse        = 3
-        Test                    = 4
-        Benchmark               = 5
+        Training                = 1 #Execute conv by using Vanilla implementation
+        Inference_Vanilla       = 2 #Execute conv by using Vanilla implementation
+        Inference_Sparse        = 3 #Execute conv by using Sparse implementation
+        Test                    = 4 #Check correctness of the Sparse output
+        Benchmark               = 5 #Print execution time of the Vanilla vs Sparse implementation
+        Calibration             = 6 #Execute benchmark and chose best mode to use on this layer with a specific batch size
 
 #--------------------------------------------------------
 #-----------Sparse Conv Custom Layer---------------------
@@ -55,20 +56,10 @@ class SparseConv2D(torch.nn.Conv2d):
                 1.Training                => Like nn.Conv2d
                 2.Inference_Vanilla       => Like nn.Conv2d
                 3.Inference_Sparse        => Sparse Convolution
+                ... (Se Sparse_modes documentation)
                 '''
 
                 self.mode =  mode
-                '''
-                if mode == Sparse_modes.Training:
-                        self.training   = True
-                        self.use_sparse = False
-                elif mode == Sparse_modes.Inference_Vanilla:
-                        self.training   = False
-                        self.use_sparse = False
-                elif mode == Sparse_modes.Inference_Sparse:
-                        self.training   = False
-                        self.use_sparse = True
-                '''
         def make_kernel_sparse(self,in_height,in_width):
                 '''
                 This method convert the kernel from (N,C,H,W) => (N,C,H*W)
@@ -160,8 +151,8 @@ class SparseConv2D(torch.nn.Conv2d):
                 ender.record()
                 # WAIT FOR GPU SYNC
                 torch.cuda.synchronize()
-                curr_time = starter.elapsed_time(ender)
-                print(f"TIME-Vanilla: {curr_time} ms")
+                vanilla_time = starter.elapsed_time(ender)
+                print(f"TIME-Vanilla: {vanilla_time} ms")
 
                 #--------------------------------------------------
                 #Compute the SparseConv2D output
@@ -171,13 +162,16 @@ class SparseConv2D(torch.nn.Conv2d):
                 ender.record()
                 # WAIT FOR GPU SYNC
                 torch.cuda.synchronize()
-                curr_time = starter.elapsed_time(ender)
-                print(f"TIME-Sparse : {curr_time} ms")
+                sparse_time = starter.elapsed_time(ender)
+                print(f"TIME-Sparse : {sparse_time} ms")
                 print("\033[0m")
                 print("-----------------------------")
                 self.set_mode(Sparse_modes.Benchmark)
-                return sparse_out
-
+                return sparse_out,vanilla_time,sparse_time
+        
+        def layer_mode_calibration(self, input:Tensor,print_flag=True) ->Tensor:
+                return #TODO
+        
         def forward(self, input: Tensor) -> Tensor:  # input: HWCN
                 #TODO CHECK if CUDA is available and in case not use nn.conv2D forward
 
@@ -192,7 +186,10 @@ class SparseConv2D(torch.nn.Conv2d):
                 elif self.mode == Sparse_modes.Test:
                         return self.test_behaviour(input,print_flag=True)
                 elif self.mode == Sparse_modes.Benchmark:
-                        return self.benchmark(input,print_flag=True)
+                        return self.benchmark(input,print_flag=True)[0]
+                elif self.mode == Sparse_modes.Calibration:
+                        return self.layer_mode_calibration(input,print_flag=True)
+                
                 #No training with sparse conv
 
                 #USE CUDA SPARSE CONV
@@ -233,7 +230,6 @@ class SparseConv2D(torch.nn.Conv2d):
                         self.padded_input = torch.zeros(padded_input_size).cuda()
 
                 #Align the input to the padded version of the input (Add 0 to the borders)
-                starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
                 if self.padding != 0:
                         #p = nn.ConstantPad2d(1,0)
                         #x = p(input).cuda()
@@ -278,7 +274,7 @@ class SparseModel(nn.Module):
                 #Change the Network mode to sparse
                 self._set_sparse_layers_mode(mode = Sparse_modes.Inference_Sparse)
                 #Generate a dummy input
-                dummy_input = torch.randn(1, 1,input_shape[2],input_shape[3], dtype=torch.float).cuda()
+                dummy_input = torch.randn(input_shape[0], input_shape[1],input_shape[2],input_shape[3], dtype=torch.float).cuda()
                 dummy_input = dummy_input.cuda()
                 #Do a forword so that all sparseConv layer initialize the CSR kernel and stuff
                 self.forward(dummy_input)
