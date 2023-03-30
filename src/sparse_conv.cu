@@ -264,7 +264,7 @@ __global__ void sconv_batch_base(const int *rowptr, const int *colidx, const Dty
 #define BLOCK_SIZE 256 // 4*4*32
 #define WARP_SIZE 32
 #define VLEN 32
-#define OC_BLOCK 1
+#define OC_BLOCK 4
 #define DIVIDE_INTO(x,y) ((x + y - 1)/y)
 #define MIN(x,y) ((x < y)? x : y)
 #define SHMEM_SIZE 1024
@@ -587,6 +587,7 @@ __global__ void sconv_batch_tiled(const int * rowptr, const int * colidx, const 
 	const int length = row_end - row_start;
 	
 	Dtype sum[FMAP_BLOCK];
+	#pragma unroll
 	for (int i=0; i < FMAP_BLOCK; i++)
 		//sum[i] = bias[oc];
 		sum[i] = 0;
@@ -604,6 +605,8 @@ __global__ void sconv_batch_tiled(const int * rowptr, const int * colidx, const 
 			}
 			__syncthreads();
 		}
+
+		#pragma unroll
 		for(int k = 0; k < FMAP_BLOCK; k ++) {
 			if (output_row < output_h) {
 				if (output_col < output_w) {
@@ -620,6 +623,8 @@ __global__ void sconv_batch_tiled(const int * rowptr, const int * colidx, const 
 		}
 		__syncthreads();
 	}
+
+	#pragma unroll
 	for(int k = 0; k < FMAP_BLOCK; k ++) {
 		//if (oc < num_oc) {
 		if (output_row < output_h) {
@@ -734,7 +739,17 @@ void caffe_gpu_sconv(bool FUSE_RELU, int num, const Dtype *input, const int ifma
 					sconv_batch_tiled<Dtype,1,16,16,56,1><<<grid, threads>>>(rowptr, colidx, values, 
 						input, ifmap_size, height, width, pad_h, pad_w, stride_h, stride_w, 
 						kernel_h, kernel_w, bias, output, num_oc, output_h, output_w, num_groups);
-				} else {	
+				} 
+				else if(num == 32){
+					//printf("OK");
+					nblocks = (num/32) * ((num_oc - 1) / OC_BLOCK + 1);
+					//printf("Num of blocks: %d\n",nblocks);
+					dim3 grid(ntiles_w, ntiles_h, nblocks);
+					sconv_batch_tiled<Dtype,32,16,16,56,1><<<grid, threads>>>(rowptr, colidx, values, 
+						input, ifmap_size, height, width, pad_h, pad_w, stride_h, stride_w, 
+						kernel_h, kernel_w, bias, output, num_oc, output_h, output_w, num_groups);
+					}
+				else {	
 					nblocks = (num/2) * ((num_oc - 1) / OC_BLOCK + 1);
 					dim3 grid(ntiles_w, ntiles_h, nblocks);
 					sconv_batch_tiled<Dtype,2,16,16,56,1><<<grid, threads>>>(rowptr, colidx, values, 

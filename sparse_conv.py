@@ -185,9 +185,9 @@ class SparseConv2D(torch.nn.Conv2d):
                 mean_sparse = mean_sparse/NUM_OF_RUN
 
                 if mean_sparse > mean_vanilla:
-                        print("\033[93m")
+                        print("\033[91m")
                 else:
-                        print("\033[95m")
+                        print("\033[92m")
 
                 print(f"Vanilla Execution: {mean_vanilla}")
                 print(f"Sparse  Execution: {mean_sparse}")

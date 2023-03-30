@@ -7,75 +7,38 @@ import torch.nn.utils.prune as prune
 import copy
 
 
-class VGG16(sp.SparseModel):
-    """
-    A standard VGG16 model
-    """
 
+class AlexNet(sp.SparseModel):
     def __init__(self, n_classes,sparse_conv_flag=True):
         self._sparse_conv_flag=sparse_conv_flag
-        super(VGG16, self).__init__(sparse_conv_flag)
+        super(AlexNet, self).__init__(sparse_conv_flag)
 
         self.layer1 = nn.Sequential(
-            self.conv(3, 64, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU())
+            self.conv(3, 96, kernel_size=11, stride=4, padding=0),
+            nn.BatchNorm2d(96),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size = 3, stride = 2))
         self.layer2 = nn.Sequential(
-            self.conv(64, 64, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(), 
-            nn.MaxPool2d(kernel_size = 2, stride = 2))
+            self.conv(96, 256, kernel_size=5, stride=1, padding=2),
+            nn.BatchNorm2d(256),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size = 3, stride = 2))
         self.layer3 = nn.Sequential(
-            self.conv(64, 128, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(128),
+            self.conv(256, 384, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(384),
             nn.ReLU())
         self.layer4 = nn.Sequential(
-            self.conv(128, 128, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size = 2, stride = 2))
+            self.conv(384, 384, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(384),
+            nn.ReLU())
         self.layer5 = nn.Sequential(
-            self.conv(128, 256, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(256),
-            nn.ReLU())
-        self.layer6 = nn.Sequential(
-            self.conv(256, 256, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(256),
-            nn.ReLU())
-        self.layer7 = nn.Sequential(
-            self.conv(256, 256, kernel_size=3, stride=1, padding=1),
+            self.conv(384, 256, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(256),
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size = 2, stride = 2))
-        self.layer8 = nn.Sequential(
-            self.conv(256, 512, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(512),
-            nn.ReLU())
-        self.layer9 = nn.Sequential(
-            self.conv(512, 512, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(512),
-            nn.ReLU())
-        self.layer10 = nn.Sequential(
-            self.conv(512, 512, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(512),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size = 2, stride = 2))
-        self.layer11 = nn.Sequential(
-            self.conv(512, 512, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(512),
-            nn.ReLU())
-        self.layer12 = nn.Sequential(
-            self.conv(512, 512, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(512),
-            nn.ReLU())
-        self.layer13 = nn.Sequential(
-            self.conv(512, 512, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(512),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size = 2, stride = 2))
+            nn.MaxPool2d(kernel_size = 3, stride = 2))
         self.fc = nn.Sequential(
             nn.Dropout(0.5),
-            nn.Linear(7*7*512, 4096),
+            nn.Linear(9216, 4096),
             nn.ReLU())
         self.fc1 = nn.Sequential(
             nn.Dropout(0.5),
@@ -90,14 +53,6 @@ class VGG16(sp.SparseModel):
         out = self.layer3(out)
         out = self.layer4(out)
         out = self.layer5(out)
-        out = self.layer6(out)
-        out = self.layer7(out)
-        out = self.layer8(out)
-        out = self.layer9(out)
-        out = self.layer10(out)
-        out = self.layer11(out)
-        out = self.layer12(out)
-        out = self.layer13(out)
         out = out.reshape(out.size(0), -1)
         out = self.fc(out)
         out = self.fc1(out)
@@ -120,6 +75,7 @@ def pruning_model_random(model, px):
         amount=px,
     ) 
     
+
 N_CLASSES       = 10
 IMG_SIZE        = 227
 BATCH_SIZE      = 32
@@ -133,7 +89,7 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(device)
 
 #LOAD THE MODEL
-model = VGG16(N_CLASSES,sparse_conv_flag=True)
+model = AlexNet(N_CLASSES,sparse_conv_flag=True)
 model.to(device)
 
 #PRUNE THE MODEL TO ADD SPARSITY
@@ -160,7 +116,7 @@ model._set_sparse_layers_mode(sp.Sparse_modes.Calibration)
 print("----------------------------------")
 print("-----Example of Benchmark or Test-------")
 print("----------------------------------")
-batch_size = 1
+
 dummy_input = torch.randn(INPUT_SHAPE, dtype=torch.float).to(device)
 dummy_input = dummy_input.cuda()
 
