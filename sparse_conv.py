@@ -145,14 +145,15 @@ class SparseConv2D(torch.nn.Conv2d):
                 #--------------------------------------------------
                 #Compute nn.Conv2D output
                 #--------------------------------------------------
-                print("\033[93m")
                 starter.record()
                 vanilla_out = super().forward(input)
                 ender.record()
                 # WAIT FOR GPU SYNC
                 torch.cuda.synchronize()
                 vanilla_time = starter.elapsed_time(ender)
-                print(f"TIME-Vanilla: {vanilla_time} ms")
+                if print_flag:
+                        print("\033[93m")
+                        print(f"TIME-Vanilla: {vanilla_time} ms")
 
                 #--------------------------------------------------
                 #Compute the SparseConv2D output
@@ -163,14 +164,37 @@ class SparseConv2D(torch.nn.Conv2d):
                 # WAIT FOR GPU SYNC
                 torch.cuda.synchronize()
                 sparse_time = starter.elapsed_time(ender)
-                print(f"TIME-Sparse : {sparse_time} ms")
-                print("\033[0m")
-                print("-----------------------------")
+                if print_flag:
+                        print(f"TIME-Sparse : {sparse_time} ms")
+                        print("\033[0m")
+                if print_flag:
+                        print("-----------------------------")
                 self.set_mode(Sparse_modes.Benchmark)
                 return sparse_out,vanilla_time,sparse_time
         
         def layer_mode_calibration(self, input:Tensor,print_flag=True) ->Tensor:
-                return #TODO
+                mean_vanilla = 0
+                mean_sparse  = 0
+
+                NUM_OF_RUN = 100
+                for _ in range(NUM_OF_RUN):
+                        out,vanilla,sparse = self.benchmark(input,print_flag=False)
+                        mean_vanilla = mean_vanilla + vanilla
+                        mean_sparse  = mean_sparse + sparse
+                mean_vanilla = mean_vanilla/NUM_OF_RUN
+                mean_sparse = mean_sparse/NUM_OF_RUN
+
+                if mean_sparse > mean_vanilla:
+                        print("\033[93m")
+                else:
+                        print("\033[95m")
+
+                print(f"Vanilla Execution: {mean_vanilla}")
+                print(f"Sparse  Execution: {mean_sparse}")
+
+                print("\033[0m")
+
+                return out
         
         def forward(self, input: Tensor) -> Tensor:  # input: HWCN
                 #TODO CHECK if CUDA is available and in case not use nn.conv2D forward

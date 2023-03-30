@@ -95,13 +95,13 @@ def pruning_model_random(model, px):
         amount=px,
     ) 
     
-RANDOM_SEED = 42
-LEARNING_RATE = 0.001
-BATCH_SIZE = 32
-N_EPOCHS = 4
+
 PRUNING_PARAMETER = 0.7
 IMG_SIZE = 224
 N_CLASSES = 10
+BATCH_SIZE = 32
+
+INPUT_SHAPE = (BATCH_SIZE,3,IMG_SIZE,IMG_SIZE)
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 # Assuming that we are on a CUDA machine, this should print a CUDA device:
@@ -120,7 +120,7 @@ pruning_model_random(model,PRUNING_PARAMETER)
 print("----------------------------------")
 print("-----Initialize the Network-------")
 print("----------------------------------")
-model._initialize_sparse_layers(input_shape=(32,3,IMG_SIZE,IMG_SIZE))
+model._initialize_sparse_layers(input_shape=INPUT_SHAPE)
 model._set_sparse_layers_mode(sp.Sparse_modes.Benchmark)
 
 #------------------------------------------
@@ -134,8 +134,8 @@ model._set_sparse_layers_mode(sp.Sparse_modes.Benchmark)
 print("----------------------------------")
 print("-----Example of Benchmark or Test-------")
 print("----------------------------------")
-batch_size = 32
-dummy_input = torch.randn(batch_size, 3,IMG_SIZE,IMG_SIZE, dtype=torch.float).to(device)
+
+dummy_input = torch.randn(INPUT_SHAPE, dtype=torch.float).to(device)
 dummy_input = dummy_input.cuda()
 
 print(f"INPUT SHAPE : {dummy_input.shape}")
