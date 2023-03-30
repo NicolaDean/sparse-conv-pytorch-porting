@@ -78,7 +78,7 @@ def pruning_model_random(model, px):
 
 N_CLASSES       = 10
 IMG_SIZE        = 227
-BATCH_SIZE      = 32
+BATCH_SIZE      = 1
 INPUT_CHANNELS  = 3
 PRUNING_PARAMETER = 0.90
 

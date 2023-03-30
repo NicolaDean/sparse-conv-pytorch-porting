@@ -264,7 +264,7 @@ __global__ void sconv_batch_base(const int *rowptr, const int *colidx, const Dty
 #define BLOCK_SIZE 256 // 4*4*32
 #define WARP_SIZE 32
 #define VLEN 32
-#define OC_BLOCK 4
+#define OC_BLOCK 1
 #define DIVIDE_INTO(x,y) ((x + y - 1)/y)
 #define MIN(x,y) ((x < y)? x : y)
 #define SHMEM_SIZE 1024
