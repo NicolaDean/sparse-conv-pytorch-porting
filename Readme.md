@@ -56,7 +56,27 @@ class VGG16(sp.SparseModel):
         [...Model Definition...]
 
 ```
+# SparseModel Configurations available.
+You can configure the SparseModel (so all the SparseConv2D layers) in 6 different modes:
+```
+class Sparse_modes(Enum):
+        Training                = 1 #Execute conv by using Vanilla implementation
+        Inference_Vanilla       = 2 #Execute conv by using Vanilla implementation
+        Inference_Sparse        = 3 #Execute conv by using Sparse implementation
+        Test                    = 4 #Check correctness of the Sparse output
+        Benchmark               = 5 #Print execution time of the Vanilla vs Sparse
+        Calibration             = 6 #Chose best performance Mode (Work in prog.)
+```
 
+### Usage:
+```
+[...Some Code...]
+model = VGG16(N_CLASSES,sparse_conv_flag=True)
+model.to(device)
+model._initialize_sparse_layers(input_shape=INPUT_SHAPE)
+model._set_sparse_layers_mode(sp.Sparse_modes.Benchmark)
+[...Some Code...]
+```
 # How Run the example:
 TODO better
 
