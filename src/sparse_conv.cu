@@ -4,6 +4,25 @@
 #include <thrust/reduce.h>
 #include <cmath>
 
+
+/*
+Except for the extern c porting functions all other code is taken from Escoin-Caffe Framework
+
+Escoin in a Caffe branch with SparseConvolution features.
+It aim GPU accelerating convoluntion in context where kernels has hight sparsity factor.
+
+It Working principle are based on CSR kernel compression.
+
+The paper that describe the SparseConvolution implementation contained in Ecosin is available at: https://arxiv.org/pdf/1802.10280.pdf
+
+The original C++/CUDA code is available at:
+https://github.com/chenxuhao/caffe-escoin
+
+More specifically, search for function caffe_gpu_sconv(...) inside this file:
+https://github.com/chenxuhao/caffe-escoin/blob/master/src/caffe/util/math_functions.cu
+
+*/
+
 //By Nicola Dean
 extern "C" void test_wrapper(); 
 

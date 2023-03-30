@@ -1,12 +1,12 @@
 # Repo Content: (Work in progress)
 
-This repository is a porting of Ecosin Caffe Branch to Pytorch.\
+This repository is a porting of Escoin Caffe Branch to Pytorch.\
 If intrested there is also a Tensorflow Porting of the same code: TODO
 
-# Ecosin Framework:
+# Escoin Framework:
 (TODO write better)
 
-Ecosin in a Caffe branch with **SparseConvolution** features.\
+Escoin in a Caffe branch with **SparseConvolution** features.\
 It aim GPU accelerating convoluntion in context where kernels has hight sparsity factor.
 
 It Working principle are based on CSR kernel compression.
