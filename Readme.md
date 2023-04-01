@@ -25,7 +25,7 @@ https://github.com/chenxuhao/caffe-escoin/blob/master/src/caffe/util/math_functi
 # How To use:
 TODO => make better instructions\
 To use our custom pytorch layer simply compile it with the Makefile then:\
-```
+```python
 import sparse_conv as sp
 
 
@@ -37,7 +37,7 @@ You can also use our sp.SparseModel helper class that facilitate the creation an
 **(Check [vgg16_benchmark.py](vgg16_benchmark.py) or [resnet_benchmark.py](resnet_benchmark.py) to have better understanding of usage)**
 
 
-```
+```python
 class VGG16(sp.SparseModel):
     """
     A standard VGG16 model
@@ -61,7 +61,7 @@ class VGG16(sp.SparseModel):
 ```
 # SparseModel Configurations available.
 You can configure the SparseModel (so all the SparseConv2D layers) in 6 different modes:
-```
+```python
 class Sparse_modes(Enum):
         Training                = 1 #Execute conv by using Vanilla implementation
         Inference_Vanilla       = 2 #Execute conv by using Vanilla implementation
@@ -72,7 +72,7 @@ class Sparse_modes(Enum):
 ```
 
 ### Usage:
-```
+```python
 [...Some Code...]
 model = VGG16(N_CLASSES,sparse_conv_flag=True)
 model.to(device)
@@ -94,7 +94,7 @@ python test_behaviour.py
 ```
 - If you see as output the following all works fine.
 - (This function is to fix a little since sometimes also a single digit of difference in output will make this function trigger exception)
-```
+```python
 Vanilla vs SparseConv:
 SUCCESS => Same Outputs
 IN -shape: torch.Size([1, 1, 32, 32])
@@ -103,20 +103,20 @@ OUT-shape: torch.Size([1, 6, 28, 28])
 
 ### Basic Full Network Behavioural test
 Same working principle of the previous example but with a full net (Vgg16)
-```
+```python
 python test_behaviour_full_net.py
 ```
 
 ### VGG16 Benchmark script
 Check [vgg16_benchmark.py](vgg16_benchmark.py)
 
-```
+```python
 python vgg16_benchmark.py
 ```
 ### Resnet Benchmark script
 Check [resnet_benchmark.py](resnet_benchmark.py)
 
-```
+```python
 python resnet_benchmark.py
 ```
 # How It works:
