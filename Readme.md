@@ -1,5 +1,7 @@
 # Repo Content: (Work in progress => Not yet relevant speedup)
 
+Contact me at: nicola.dean@mail.polimi.it (or make an Issue) for any problem.
+
 This repository is a porting of Escoin Caffe Branch to Pytorch.\
 If intrested there is also a Tensorflow Porting of the same code: TODO
 
