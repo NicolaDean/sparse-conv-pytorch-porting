@@ -1,4 +1,4 @@
-# Repo Content: (Work in progress)
+# Repo Content: (Work in progress => Not yet relevant speedup)
 
 This repository is a porting of Escoin Caffe Branch to Pytorch.\
 If intrested there is also a Tensorflow Porting of the same code: TODO
